@@ -1,0 +1,35 @@
+/*
+* Apex Class: ReportUtilityTest
+* Description:
+	- Test class for ReportUtility
+	- Create custom report with the following:
+		.No row/column grouping
+		.First column is Id field
+		.Minimum two filters
+		.Filter logic (e.g. 1 OR 2)
+		.Minimum one cross-filter
+* Created By: SubC4i
+* Created Date: 7/5/2024
+* Last Modified By: SubC4i
+* Last Modified: 7/11/2024
+*/
+
+@isTest
+private class ReportUtilityTest {
+
+	@isTest(SeeAllData='true')
+	static void testUtilityMethods(){
+		Test.startTest();
+			//Report Utility
+			ReportUtility utility = new ReportUtility();
+			//Get Report Id
+			Id reportId = utility.getReportId('ReportUtilityTest', 'ReportUtilityTest', null);
+			//Get Filters
+			utility.getFilters(reportId);
+			//Get Records Ids
+			utility.getRecordIds(reportId);
+			//Exclude Previous Record Id Results
+			utility.getRecordIds(reportId);
+		Test.stopTest();
+	}
+}
