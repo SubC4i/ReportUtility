@@ -4,7 +4,7 @@
 	- Get Report Id from Name or DeveloperName and FolderName (if applicable)
 	- Collect Record Ids from report results
 	- Collect Filter Logic and list of Filters (including Cross-Filters) from report
-	- Convert filter objects and fields from report API name to labels
+	- Convert filter objects, fields, and operators from report API name to labels
 	- Bypass API limit of 2,000 records and instead up until SOQL row limit of 50,000
 	- Important Notes
 		.Source reports cannot have row/column grouping
@@ -16,7 +16,7 @@
 * Created By: SubC4i
 * Created Date: 7/4/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/11/2024
+* Last Modified: 7/16/2024
 */
 
 public class ReportUtility {
@@ -83,9 +83,7 @@ public class ReportUtility {
 		Reports.ReportFactWithDetails factDetails = (Reports.ReportFactWithDetails)results.getFactMap().get('T!T');
 		//Grand Total
 		List<Reports.SummaryValue> sumValList = factDetails.getAggregates();
-		Reports.SummaryValue sumVal = factDetails.getAggregates().get(sumValList.size()-1);
-		Decimal sumValNum = (Decimal)sumVal.getValue();
-		Integer grandTotal = sumValNum.intValue();
+		Integer grandTotal = ((Decimal)sumValList.get(sumValList.size()-1).getValue()).intValue();
 		totalSoqlRows += grandTotal;
 		//Initial Report Total
 		totalReportRows = totalReportRows < 1 ? grandTotal : totalReportRows;
@@ -132,14 +130,24 @@ public class ReportUtility {
 				filterLabelMap.put(fieldApi, repTypeCol.getColumns().get(fieldApi).getLabel());
 			}
 		}
-		//Filter Logic
+		//Boolean Logic
 		filterLogic = meta.getReportBooleanFilter();
-		//Filter Columns
+		//Operators
+		Map<String,String> filterOpLabelMap = new Map<String,String>();
+		for(List<Reports.FilterOperator> filterOpList: Reports.ReportManager.getDatatypeFilterOperatorMap().values()){
+			for(Reports.FilterOperator fo: filterOpList){
+				filterOpLabelMap.put(fo.getName(), fo.getLabel());
+			}
+		}		
+		//Filters
 		Integer filterNum = 1;
 		for(Reports.ReportFilter filter: meta.getReportFilters()){
 			String columnApiName = filter.getColumn();
 			String columnLabel = filterLabelMap.containsKey(columnApiName) ? filterLabelMap.get(columnApiName) : columnApiName;
-			String filterString = String.valueOf(filterNum) + '. ' + columnLabel + ' ' + filter.getOperator() + ' ' + filter.getValue();
+			String filterOp = filter.getOperator();
+			String filterOpLabel = filterOpLabelMap.containsKey(filterOp) ? filterOpLabelMap.get(filterOp) : filterOp;
+			String filterValue = '"' + filter.getValue() + '"';
+			String filterString = String.valueOf(filterNum) + '. ' + columnLabel + ' ' + filterOpLabel + ' ' + filterValue;
 			filterList.add(filterString);
 			filterNum++;
 		}
@@ -159,7 +167,10 @@ public class ReportUtility {
 			for(Reports.ReportFilter filter: crossFilter.getCriteria()){
 				String columnApiName = filter.getColumn();
 				String columnLabel = objectFieldMap.containsKey(columnApiName) ? objectFieldMap.get(columnApiName).getDescribe().getLabel() : columnApiName;
-				String filterString = columnLabel + ' ' + filter.getOperator() + ' ' + filter.getValue();
+				String filterOp = filter.getOperator();
+				String filterOpLabel = filterOpLabelMap.containsKey(filterOp) ? filterOpLabelMap.get(filterOp) : filterOp;
+				String filterValue = '"' + filter.getValue() + '"';
+				String filterString = columnLabel + ' ' + filterOpLabel + ' ' + filterValue;
 				subFilterList.add(filterString);
 			}
 			//Add to Map
