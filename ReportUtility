@@ -16,7 +16,7 @@
 * Created By: SubC4i
 * Created Date: 7/4/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/16/2024
+* Last Modified: 7/18/2024
 */
 
 public class ReportUtility {
@@ -38,7 +38,7 @@ public class ReportUtility {
 		whereSoql = String.isNotBlank(reportDevName) ? formatWhereSOQL(whereSOQL, 'DeveloperName =:reportDevName') : whereSoql;
 		whereSoql = String.isNotBlank(folderName) ? formatWhereSOQL(whereSOQL, 'FolderName =:folderName') : whereSoql;
 		whereSoql = String.isNotBlank(whereSoql) ? ' WHERE ' + whereSoql : whereSoql;
-		String fullSoql = selectSoql + whereSoql;
+		String fullSoql = selectSoql + whereSoql + ' LIMIT 1 ';
 		Id reportId = Database.query(fullSoql)?.Id;
 		return reportId;
 	}
@@ -138,7 +138,7 @@ public class ReportUtility {
 			for(Reports.FilterOperator fo: filterOpList){
 				filterOpLabelMap.put(fo.getName(), fo.getLabel());
 			}
-		}		
+		}
 		//Filters
 		Integer filterNum = 1;
 		for(Reports.ReportFilter filter: meta.getReportFilters()){
