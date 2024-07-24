@@ -16,13 +16,14 @@
 * Created By: SubC4i
 * Created Date: 7/4/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/18/2024
+* Last Modified: 7/24/2024
 */
 
 public class ReportUtility {
 
 	public Set<Id> recordIds = new Set<Id>();
 	public String recordObjectType = '';
+	public String reportDescription = '';
 	public String filterLogic = '';
 	public List<String> filterList = new List<String>();
 	public Map<String,List<String>> crossFilterMap = new Map<String,List<String>>();
@@ -130,8 +131,10 @@ public class ReportUtility {
 				filterLabelMap.put(fieldApi, repTypeCol.getColumns().get(fieldApi).getLabel());
 			}
 		}
+		//Description
+		reportDescription = String.isNotBlank(meta.getDescription()) ? meta.getDescription() : '';
 		//Boolean Logic
-		filterLogic = meta.getReportBooleanFilter();
+		filterLogic = String.isNotBlank(meta.getReportBooleanFilter()) ? meta.getReportBooleanFilter() : '';
 		//Operators
 		Map<String,String> filterOpLabelMap = new Map<String,String>();
 		for(List<Reports.FilterOperator> filterOpList: Reports.ReportManager.getDatatypeFilterOperatorMap().values()){
