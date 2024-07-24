@@ -1,0 +1,184 @@
+/*
+* Apex Class: ReportUtilityRestService
+* Description:
+	- REST Service to access ReportUtility functions
+	- HTTP POST to /services/apexrest/ReportUtility/
+* Created By: SubC4i
+* Created Date: 7/17/2024
+* Last Modified By: SubC4i
+* Last Modified: 7/24/2024
+*/
+
+/*
+JSON Request Format - ReportId
+{
+	"RequestType":"ReportId",
+	"ReportName":"Fake Name",
+	"ReportDevName":"Fake_Report_Name",
+	"FolderName":"Fake Report Folder Name"
+}
+
+JSON Request Format - ReportFilters
+{
+	"RequestType":"ReportFilters",
+	"ReportId":"00OZZ000000Z0zzZZX"
+}
+
+JSON Request Format - ReportResults
+{
+	"RequestType":"ReportResults",
+	"ReportId":"00OZZ000000Z0zzZZX"
+}
+*/
+
+@RestResource(urlMapping='/ReportUtility/*')
+global with sharing class ReportUtilityRestService {
+
+	@HttpPost
+	global static void getReportInfo(){
+		//Request
+		RestRequest request = RestContext.request;
+		//Response
+		RestResponse response = RestContext.response;
+		//Wrapper
+		ReportWrapper rw = new ReportWrapper();
+		//Deserialize JSON Request Body
+		Map<String,Object> dataMap = (Map<String,Object>)JSON.deserializeUntyped(request.requestBody.toString());
+		if(dataMap != null){
+			for(String fieldName: dataMap.keySet()){
+				//Field Data
+				String fieldData = String.valueOf(dataMap.get(fieldName));
+				fieldData = String.isNotBlank(fieldData) ? String.escapeSingleQuotes(fieldData) : fieldData;
+				//Request Type
+				rw.requestType = fieldName.containsIgnoreCase('RequestType') ? fieldData : rw.requestType;
+				//Report Id
+				rw.reportId = fieldName.containsIgnoreCase('ReportId') ? fieldData : rw.reportId;
+				//Report Label
+				rw.reportName = fieldName.containsIgnoreCase('ReportName') ? fieldData : rw.reportName;
+				//Report API Name
+				rw.reportDevName = fieldName.containsIgnoreCase('ReportDevName') ? fieldData : rw.reportDevName;
+				//Folder Name
+				rw.folderName = fieldName.containsIgnoreCase('FolderName') ? fieldData : rw.folderName;
+			}
+		}
+		//Run Utility
+		ReportUtility utility = new ReportUtility();
+		switch on rw.requestType {
+			when 'ReportId' {
+				rw.reportId = utility.getReportId(rw.reportName, rw.reportDevName, rw.folderName);
+			}
+			when 'ReportFilters' {
+				utility.getFilters(rw.reportId);
+				rw.filterLogic = utility.filterLogic;
+				rw.filterList = utility.filterList;
+				rw.crossFilterMap = utility.crossFilterMap;
+				rw.reportDescription = utility.reportDescription;
+			}
+			when 'ReportResults' {
+				utility.getRecordIds(rw.reportId);
+				rw.recordObjectType = utility.recordObjectType;
+				rw.totalReportRows = utility.totalReportRows;
+				rw.hasAllResults = utility.hasAllResults;
+				rw.statusMessage = utility.statusMessage;
+				rw.recordIds.addAll(utility.recordIds);
+			}
+		}
+		//Response Body
+		response.responseBody = Blob.valueOf(createResponseJson(rw));
+	}
+
+	public static String createResponseJson(ReportWrapper rw){
+		//Generate JSON String
+		JSONGenerator gen = JSON.createGenerator(false);
+		gen.writeStartObject();
+		switch on rw.requestType {
+			when 'ReportId' {
+				gen.writeIdField('Report Id', rw.reportId);
+			}
+			when 'ReportFilters' {
+				//Logic
+				gen.writeStringField('Filter Logic', rw.filterLogic);
+				//Filters
+				gen.writeFieldName('Filters');
+				gen.writeStartArray();
+				for(String filter: rw.filterList){
+					gen.writeString(filter.remove('"'));
+				}
+				gen.writeEndArray();
+				//Cross-Filters
+				for(String relateObject: rw.crossFilterMap.keySet()){
+					gen.writeFieldName(relateObject);
+					gen.writeStartArray();
+					for(String filter: rw.crossFilterMap.get(relateObject)){
+						gen.writeString(filter.remove('"'));
+					}
+					gen.writeEndArray();
+				}
+				//Description
+				gen.writeStringField('Description', rw.reportDescription);
+			}
+			when 'ReportResults' {
+				//Summary
+				gen.writeStringField('Record Object Type', rw.recordObjectType);
+				gen.writeNumberField('Total Records', rw.totalReportRows);
+				gen.writeBooleanField('Has All Results', rw.hasAllResults);
+				gen.writeStringField('Status Message', rw.statusMessage);
+				//Record Ids List
+				gen.writeFieldName('RecordIds');
+				gen.writeStartArray();
+				for(Id recordId: rw.recordIds){
+					gen.writeId(recordId);
+				}
+				gen.writeEndArray();
+			}
+		}
+		gen.writeEndObject();
+		String jsonString = gen.getAsString();
+		return jsonString;
+	}
+
+	//Inner Wrapper Class
+	public class ReportWrapper {
+		//Request Type
+		public String requestType {get;set;}
+		//Info
+		public Id reportId {get;set;}
+		public String reportName {get;set;}
+		public String reportDevName {get;set;}
+		public String folderName {get;set;}
+		//Filters
+		public String recordObjectType {get;set;}
+		public String filterLogic {get;set;}
+		public List<String> filterList {get;set;}
+		public Map<String,List<String>> crossFilterMap {get;set;}
+		//Description
+		public String reportDescription {get;set;}
+		//Results
+		public Set<Id> recordIds {get;set;}
+		public Integer totalReportRows {get;set;}
+		public Boolean hasAllResults {get;set;}
+		public String statusMessage {get;set;}
+
+		public ReportWrapper(){
+			//Request Type
+			requestType = '';
+			//Info
+			reportId = null;
+			reportName = '';
+			reportDevName = '';
+			folderName = '';
+			//Filters
+			recordObjectType = '';
+			filterLogic = '';
+			filterList = new List<String>();
+			crossFilterMap = new Map<String,List<String>>();
+			//Description
+			reportDescription = '';
+			//Results
+			recordIds = new Set<Id>();
+			totalReportRows = 0;
+			hasAllResults = false;
+			statusMessage = '';
+		}
+	}
+}
