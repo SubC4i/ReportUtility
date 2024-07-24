@@ -29,6 +29,7 @@ public class ReportUtility {
 	public Map<String,List<String>> crossFilterMap = new Map<String,List<String>>();
 	public Integer totalReportRows = 0;
 	public Integer totalSoqlRows = 0;
+	public Integer totalRowCount = 0;
 	public Boolean hasAllResults = false;
 	public String statusMessage = '';
 	
@@ -96,6 +97,7 @@ public class ReportUtility {
 		Integer rowCount = 0;
 		for(Reports.ReportDetailRow row: factDetails.getRows()){
 			rowCount++;
+			totalRowCount++;
 			//First Column Data (Expecting Id)
 			Reports.ReportDataCell dataCell = row.getDataCells().get(0);
 			Object cellData = dataCell.getValue();
@@ -111,8 +113,8 @@ public class ReportUtility {
 			getRecordIds(reportId);
 		}
 		//Capture Status
-		hasAllResults = totalReportRows == recordIds.size();
-		statusMessage = String.valueOf(recordIds.size()) + ' out of ' + String.valueOf(totalReportRows) + ' Results';
+		hasAllResults = totalReportRows == totalRowCount;
+		statusMessage = String.valueOf(totalRowCount) + ' out of ' + String.valueOf(totalReportRows) + ' Results';
 	}
 
 	public void getFilters(Id reportId){
