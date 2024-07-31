@@ -2,6 +2,7 @@
 * Apex Class: ReportUtility
 * Description: 
 	- Get Report Id from Name or DeveloperName and FolderName (if applicable)
+	- Get list of reports w/details for specified Folder
 	- Collect Record Ids from report results
 	- Collect Filter Logic and list of Filters (including Cross-Filters) from report
 	- Convert filter objects, fields, and operators from report API name to labels
@@ -16,7 +17,7 @@
 * Created By: SubC4i
 * Created Date: 7/4/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/24/2024
+* Last Modified: 7/30/2024
 */
 
 public class ReportUtility {
@@ -47,6 +48,10 @@ public class ReportUtility {
 
 	private String formatWhereSOQL(String whereSOQL, String addedSOQL){
 		return String.isBlank(whereSOQL) ? whereSOQL = addedSOQL : whereSOQL + ' AND ' + addedSOQL;
+	}
+
+	public List<Report> getFolderReports(String folderName){
+		return new List<Report>([SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE FolderName =:folderName ORDER BY Name ASC]);
 	}
 
 	public void getRecordIds(Id reportId){
