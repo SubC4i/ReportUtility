@@ -6,7 +6,7 @@
 * Created By: SubC4i
 * Created Date: 7/17/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/24/2024
+* Last Modified: 7/30/2024
 */
 
 /*
@@ -15,6 +15,12 @@ JSON Request Format - ReportId
 	"RequestType":"ReportId",
 	"ReportName":"Fake Name",
 	"ReportDevName":"Fake_Report_Name",
+	"FolderName":"Fake Report Folder Name"
+}
+
+JSON Request Format - FolderReports
+{
+	"RequestType":"FolderReports",
 	"FolderName":"Fake Report Folder Name"
 }
 
@@ -67,6 +73,9 @@ global with sharing class ReportUtilityRestService {
 			when 'ReportId' {
 				rw.reportId = utility.getReportId(rw.reportName, rw.reportDevName, rw.folderName);
 			}
+			when 'FolderReports' {
+				rw.folderReportsList = utility.getFolderReports(rw.folderName);
+			}
 			when 'ReportFilters' {
 				utility.getFilters(rw.reportId);
 				rw.filterLogic = utility.filterLogic;
@@ -90,12 +99,25 @@ global with sharing class ReportUtilityRestService {
 	public static String createResponseJson(ReportWrapper rw){
 		//Generate JSON String
 		JSONGenerator gen = JSON.createGenerator(false);
-		gen.writeStartObject();
 		switch on rw.requestType {
 			when 'ReportId' {
+				gen.writeStartObject();
 				gen.writeIdField('Report Id', rw.reportId);
+				gen.writeEndObject();
+			}
+			when 'FolderReports' {
+				gen.writeStartArray();
+				for(Report r: rw.folderReportsList){
+					gen.writeStartObject();
+					gen.writeStringField('Name', r.Name);
+					gen.writeStringField('DeveloperName', r.DeveloperName);
+					gen.writeStringField('Id', r.Id);
+					gen.writeEndObject();
+				}
+				gen.writeEndArray();
 			}
 			when 'ReportFilters' {
+				gen.writeStartObject();
 				//Logic
 				gen.writeStringField('Filter Logic', rw.filterLogic);
 				//Filters
@@ -116,8 +138,10 @@ global with sharing class ReportUtilityRestService {
 				}
 				//Description
 				gen.writeStringField('Description', rw.reportDescription);
+				gen.writeEndObject();
 			}
 			when 'ReportResults' {
+				gen.writeStartObject();
 				//Summary
 				gen.writeStringField('Record Object Type', rw.recordObjectType);
 				gen.writeNumberField('Total Records', rw.totalReportRows);
@@ -130,9 +154,9 @@ global with sharing class ReportUtilityRestService {
 					gen.writeId(recordId);
 				}
 				gen.writeEndArray();
+				gen.writeEndObject();
 			}
 		}
-		gen.writeEndObject();
 		String jsonString = gen.getAsString();
 		return jsonString;
 	}
@@ -146,6 +170,8 @@ global with sharing class ReportUtilityRestService {
 		public String reportName {get;set;}
 		public String reportDevName {get;set;}
 		public String folderName {get;set;}
+		//Folder Reports
+		public List<Report> folderReportsList {get;set;}
 		//Filters
 		public String recordObjectType {get;set;}
 		public String filterLogic {get;set;}
@@ -167,6 +193,8 @@ global with sharing class ReportUtilityRestService {
 			reportName = '';
 			reportDevName = '';
 			folderName = '';
+			//Folder Reports
+			folderReportsList = new List<Report>();
 			//Filters
 			recordObjectType = '';
 			filterLogic = '';
