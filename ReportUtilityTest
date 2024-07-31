@@ -11,7 +11,7 @@
 * Created By: SubC4i
 * Created Date: 7/5/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/11/2024
+* Last Modified: 7/30/2024
 */
 
 @isTest
@@ -26,10 +26,84 @@ private class ReportUtilityTest {
 			Id reportId = utility.getReportId('ReportUtilityTest', 'ReportUtilityTest', null);
 			//Get Filters
 			utility.getFilters(reportId);
+			//Get Folder Reports
+			utility.getFolderReports('Admin Reports');
 			//Get Records Ids
 			utility.getRecordIds(reportId);
 			//Exclude Previous Record Id Results
 			utility.getRecordIds(reportId);
 		Test.stopTest();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testRestReportId(){
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType":"ReportId","ReportName":"ReportUtilityTest","ReportDevName":"ReportUtilityTest"}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testRestFolderReports(){
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType": "FolderReports","FolderName": "Admin Reports"}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testRestReportFilters(){
+		//Report Id
+		Id reportId = [SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE DeveloperName = 'ReportUtilityTest' LIMIT 1]?.Id;
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType":"ReportFilters","ReportId":"'+ reportId + '"}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testRestReportResults(){
+		//Report Id
+		Id reportId = [SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE DeveloperName = 'ReportUtilityTest' LIMIT 1]?.Id;
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType":"ReportResults","ReportId":"'+ reportId + '"}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
 	}
 }
