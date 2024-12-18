@@ -6,18 +6,20 @@
 	- Collect Record Ids from report results
 	- Collect Filter Logic and list of Filters (including Cross-Filters) from report
 	- Convert filter objects, fields, and operators from report API name to labels
-	- Bypass API limit of 2,000 records and instead up until SOQL row limit of 50,000
+	- Bypass API limit of 2,000 records and instead up until SOQL row limit of 50,000 per transaction
 	- Important Notes
-		.Source reports cannot have row/column grouping
 		.Desired record Id field must be first column in report
 		.Target limit for report results should be 10,000 records
+		.Report can have up to 18 filters to work for all scenarios
 		.SOQL Limit Example 1: (10000 + 8000 + 6000 + 4000 + 2000) = 30000
 		.SOQL Limit Example 2: (15000 + 13000 + 11000 + 8000 + 6000 + 4000 + 2000) = 59000
-		.If report total > 2000 then need room for additional filter (Max filters-1) (e.g. 20-1=19)
+		.Standard - If report total > 2000 then need room for additional filter (Max filters-1) (i.e. 20-1=19)
+		.Custom Filter - If report total > 2000 then need room for two additional filters (Max filters-2) (i.e. 20-2=18)
+		.Custom Filter - Only works with custom fields (Field_Name__c)
 * Created By: SubC4i
 * Created Date: 7/4/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/30/2024
+* Last Modified: 10/14/2024
 */
 
 public class ReportUtility {
@@ -51,75 +53,7 @@ public class ReportUtility {
 	}
 
 	public List<Report> getFolderReports(String folderName){
-		return new List<Report>([SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE FolderName =:folderName ORDER BY Name ASC]);
-	}
-
-	public void getRecordIds(Id reportId){
-		//Report Describe
-		Reports.ReportDescribeResult describe = Reports.ReportManager.describeReport(reportId);
-		//Report Metadata
-		Reports.ReportMetadata meta = describe.getReportMetadata();
-		//Filter Existing Record Ids to Exceed API Limit of 2000 Results
-		String filterField = meta.getDetailColumns().get(0);
-		String filterValues = '';
-		for(Id recId: recordIds){
-			filterValues += String.isNotBlank(filterValues) ? ',' : '';
-			filterValues += '\'' + recId + '\'';
-		}
-		if(String.isNotBlank(filterValues)){
-			List<Reports.ReportFilter> allFilters = new List<Reports.ReportFilter>();
-			//Existing Filters from Report
-			List<Reports.ReportFilter> existingFilters = meta.getReportFilters();
-			allFilters.addAll(existingFilters);
-			//Filter to Exclude Record Ids
-			Reports.ReportFilter excludeIdsfilter = new Reports.ReportFilter(filterField, 'notEqual', filterValues);
-			allFilters.add(excludeIdsfilter);
-			//Update Report Filters
-			meta.setReportFilters(allFilters);
-			//Adjust for Filter Logic (if applicable)
-			String currentLogic = meta.getReportBooleanFilter();
-			String newFilterNum = String.valueOf(existingFilters.size() + 1);
-			String newLogic = String.isNotBlank(currentLogic) ? '(' + currentLogic + ') AND ' + newFilterNum : '';
-			if(String.isNotBlank(newLogic)){
-				meta.setReportBooleanFilter(newLogic);
-			}
-		}
-		//Run Report
-		Reports.ReportResults results = Reports.ReportManager.runReport(reportId, meta, true);
-		//Report Fact Details
-		Reports.ReportFactWithDetails factDetails = (Reports.ReportFactWithDetails)results.getFactMap().get('T!T');
-		//Grand Total
-		List<Reports.SummaryValue> sumValList = factDetails.getAggregates();
-		Integer grandTotal = ((Decimal)sumValList.get(sumValList.size()-1).getValue()).intValue();
-		totalSoqlRows += grandTotal;
-		//Initial Report Total
-		totalReportRows = totalReportRows < 1 ? grandTotal : totalReportRows;
-		//SOQL Limits
-		Integer totalNext = grandTotal > 2000 ? grandTotal - 2000 : grandTotal;
-		Integer totalAfterNext = totalSoqlRows + totalNext;
-		Boolean runNextQuery = totalAfterNext < Limits.getLimitQueryRows();
-		//Report Row Data
-		Integer rowCount = 0;
-		for(Reports.ReportDetailRow row: factDetails.getRows()){
-			rowCount++;
-			totalRowCount++;
-			//First Column Data (Expecting Id)
-			Reports.ReportDataCell dataCell = row.getDataCells().get(0);
-			Object cellData = dataCell.getValue();
-			Boolean isRecordId = cellData instanceof Id;
-			Id cellDataId = isRecordId ? (Id)cellData : null;
-			if(cellDataId != null){
-				recordIds.add(cellDataId);
-				recordObjectType = String.isBlank(recordObjectType) ? String.valueOf(cellDataId.getSobjectType()) : recordObjectType;
-			}
-		}
-		//Run Again for More Results (>2000)
-		if(rowCount >= 2000 && runNextQuery){
-			getRecordIds(reportId);
-		}
-		//Capture Status
-		hasAllResults = totalReportRows == totalRowCount;
-		statusMessage = String.valueOf(totalRowCount) + ' out of ' + String.valueOf(totalReportRows) + ' Results';
+		return new List<Report>([SELECT Id, Description, DeveloperName, FolderName, Name FROM Report WHERE FolderName =:folderName ORDER BY Name ASC]);
 	}
 
 	public void getFilters(Id reportId){
@@ -186,5 +120,140 @@ public class ReportUtility {
 			//Add to Map
 			crossFilterMap.put(crossObject, subFilterList);
 		}
+	}
+
+	public String getFirstColName(Id reportId){
+		String firstColName = Reports.ReportManager.describeReport(reportId).getReportMetadata().getDetailColumns().get(0);
+		return firstColName;
+	}
+
+	public String getCustomColName(Id reportId, String objectName, String fieldName){
+		String customCol = '';
+		String objFieldKey = String.isNotBlank(objectName) && String.isNotBlank(fieldName) ? objectName + '.' + fieldName : '';
+		if(String.isNotBlank(objFieldKey)){
+			//Report Describe
+			Reports.ReportDescribeResult describe = Reports.ReportManager.describeReport(reportId);
+			//Report Metadata
+			Reports.ReportMetadata meta = describe.getReportMetadata();
+			//Report Type Metadata
+			Reports.ReportTypeMetadata metaType = describe.getReportTypeMetadata();
+			//Report Type Categories
+			for(Reports.ReportTypeColumnCategory repTypeCol: metaType.getCategories()){
+				//Report Type Fields
+				for(String fieldApi: repTypeCol.getColumns().keySet()){
+					if(fieldApi.containsIgnoreCase(objFieldKey)){
+						customCol = fieldApi;
+					}
+				}
+			}
+		}
+		return customCol;
+	}
+
+	public Reports.ReportFilter createReportFilter(String reportColumn, String filterOperator, Set<String> filterValueSet){
+		//Format Filter Values
+		String filterValue = '';
+		for(String s: filterValueSet){
+			filterValue += String.isNotBlank(filterValue) ? ',' : '';
+			filterValue += '\'' + s + '\'';
+		}
+		//Report Filter
+		Reports.ReportFilter customfilter = new Reports.ReportFilter(reportColumn, filterOperator, filterValue);
+		return customfilter;
+	}
+
+	public void getRecordIds(Id reportId, Reports.ReportFilter customFilter){
+		//Report Describe
+		Reports.ReportDescribeResult describe = Reports.ReportManager.describeReport(reportId);
+		//Report Metadata
+		Reports.ReportMetadata meta = describe.getReportMetadata();
+		//First Column API Name
+		String firstColName = meta.getDetailColumns().get(0);
+		//Only Keep First Column (Reduce Heap)
+		meta.setDetailColumns(new List<String>{firstColName});
+		//Sort By First Column (Dependency Safeguard)
+		List<Reports.SortColumn> sortColumnList = new List<Reports.SortColumn>();
+		Reports.SortColumn sortColumn = new Reports.SortColumn();
+		sortColumn.setSortColumn(firstColName);
+		sortColumn.setSortOrder('ASCENDING');
+		sortColumnList.add(sortColumn);
+		meta.setSortBy(sortColumnList);
+		//Remove Aggregates (Dependency Safeguard)
+		meta.setAggregates(null);
+		//Remove Groupings (Isolate Detail Rows)
+		meta.setGroupingsAcross(null);
+		meta.setGroupingsDown(null);
+		//Filter Existing Record Ids to Exceed API Limit of 2000 Results
+		String filterValues = '';
+		for(Id recId: recordIds){
+			filterValues += String.isNotBlank(filterValues) ? ',' : '';
+			filterValues += '\'' + recId + '\'';
+		}
+		//Apply Filters (if applicable)
+		if(String.isNotBlank(filterValues) || customFilter != null){
+			List<Reports.ReportFilter> allFilters = new List<Reports.ReportFilter>();
+			//Existing Filters from Report
+			List<Reports.ReportFilter> existingFilters = meta.getReportFilters();
+			allFilters.addAll(existingFilters);
+			//Filter to Exclude Record Ids
+			if(String.isNotBlank(filterValues)){
+				Reports.ReportFilter excludeIdsfilter = new Reports.ReportFilter(firstColName, 'notEqual', filterValues);
+				allFilters.add(excludeIdsfilter);
+			}
+			//Custom Filter
+			if(customFilter != null){
+				allFilters.add(customFilter);
+			}
+			//Update Report Filters
+			meta.setReportFilters(allFilters);
+			//Adjust Filter Logic
+			String currentLogic = meta.getReportBooleanFilter();
+			String newLogic = '';
+			if(String.isNotBlank(currentLogic)){
+				newLogic = '(' + currentLogic + ')';
+				for(Integer i = existingFilters.size()+1; i <= allFilters.size(); i++){
+					newLogic += ' AND ' + i;
+				}
+			}
+			if(String.isNotBlank(newLogic)){
+				meta.setReportBooleanFilter(newLogic);
+			}
+		}
+		//Run Report
+		Reports.ReportResults results = Reports.ReportManager.runReport(reportId, meta, true);
+		//Report Fact Details
+		Reports.ReportFactWithDetails factDetails = (Reports.ReportFactWithDetails)results.getFactMap().get('T!T');
+		//Grand Total
+		List<Reports.SummaryValue> sumValList = factDetails.getAggregates();
+		Integer grandTotal = ((Decimal)sumValList.get(sumValList.size()-1).getValue()).intValue();
+		totalSoqlRows += grandTotal;
+		//Initial Report Total
+		totalReportRows = totalReportRows < 1 ? grandTotal : totalReportRows;
+		//SOQL Limits
+		Integer totalNext = grandTotal > 2000 ? grandTotal - 2000 : grandTotal;
+		Integer totalAfterNext = totalSoqlRows + totalNext;
+		Boolean runNextQuery = totalAfterNext < Limits.getLimitQueryRows();
+		//Report Row Data
+		Integer rowCount = 0;
+		for(Reports.ReportDetailRow row: factDetails.getRows()){
+			rowCount++;
+			totalRowCount++;
+			//First Column Data (Expecting Id)
+			Reports.ReportDataCell dataCell = row.getDataCells().get(0);
+			Object cellData = dataCell.getValue();
+			Boolean isRecordId = cellData instanceof Id;
+			Id cellDataId = isRecordId ? (Id)cellData : null;
+			if(cellDataId != null){
+				recordIds.add(cellDataId);
+				recordObjectType = String.isBlank(recordObjectType) ? String.valueOf(cellDataId.getSobjectType()) : recordObjectType;
+			}
+		}
+		//Run Again for More Results (>2000)
+		if(rowCount >= 2000 && runNextQuery){
+			getRecordIds(reportId, customFilter);
+		}
+		//Capture Status
+		hasAllResults = totalReportRows == totalRowCount;
+		statusMessage = String.valueOf(totalRowCount) + ' out of ' + String.valueOf(totalReportRows) + ' Results';
 	}
 }
