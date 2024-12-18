@@ -1,7 +1,9 @@
 /*
 * Apex Class: ReportUtilityTest
 * Description:
-	- Test class for ReportUtility
+	- Test class for
+		.ReportUtility
+		.ReportUtilityRestService
 	- Create custom report with the following:
 		.No row/column grouping
 		.First column is Id field
@@ -11,7 +13,7 @@
 * Created By: SubC4i
 * Created Date: 7/5/2024
 * Last Modified By: SubC4i
-* Last Modified: 7/30/2024
+* Last Modified: 10/11/2024
 */
 
 @isTest
@@ -29,9 +31,9 @@ private class ReportUtilityTest {
 			//Get Folder Reports
 			utility.getFolderReports('Admin Reports');
 			//Get Records Ids
-			utility.getRecordIds(reportId);
+			utility.getRecordIds(reportId, null);
 			//Exclude Previous Record Id Results
-			utility.getRecordIds(reportId);
+			utility.getRecordIds(reportId, null);
 		Test.stopTest();
 	}
 
@@ -97,6 +99,46 @@ private class ReportUtilityTest {
 		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
 		request.httpMethod = 'POST';
 		String jsonBody = '{"RequestType":"ReportResults","ReportId":"'+ reportId + '"}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testReportResultsCustom(){
+		//Report Id
+		Id reportId = [SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE DeveloperName = 'ReportUtilityTest' LIMIT 1]?.Id;
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType":"ReportResultsCustom","ReportId":"'+ reportId + '","CustomFilterObject":"Contact","CustomFilterField":"Territory__c","CustomFilterOperator":"equals","CustomFilterValue":["Yo Momma"]}';
+		request.requestBody = Blob.valueOf(jsonBody);
+		//Rest Response
+		RestResponse response = new RestResponse();
+		//Initiate Rest Context
+		RestContext.request = request;
+		RestContext.response = response;
+		//Call Apex Class Method
+		ReportUtilityRestService.getReportInfo();
+	}
+
+	@isTest(SeeAllData='true')
+	static void testReportResultsExcludeId(){
+		//Test Contact Id
+		Id contactId = [SELECT Id FROM Contact LIMIT 1]?.Id;
+		//Report Id
+		Id reportId = [SELECT Id, DeveloperName, FolderName, Name FROM Report WHERE DeveloperName = 'ReportUtilityTest' LIMIT 1]?.Id;
+		//Rest Request
+		RestRequest request = new RestRequest();
+		request.requestURI = URL.getOrgDomainURL().toExternalForm() + '/services/apexrest/ReportUtility/';
+		request.httpMethod = 'POST';
+		String jsonBody = '{"RequestType":"ReportResultsExcludeId","ReportId":"'+ reportId + '","CustomFilterValue":["0030b00001dIBKz","0030b00001uh9Vz"]}';
 		request.requestBody = Blob.valueOf(jsonBody);
 		//Rest Response
 		RestResponse response = new RestResponse();
